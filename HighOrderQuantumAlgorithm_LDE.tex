@@ -1,0 +1,283 @@
+\documentclass{article}
+\PassOptionsToPackage{quiet}{fontspec}
+\usepackage[UTF8]{ctex}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{braket}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{float} 
+\usepackage{geometry}
+\usepackage{enumitem}
+\theoremstyle{definition}
+\newtheorem{definition}{定义}
+\newtheorem{theorem}{定理}
+\newtheorem{lemma}{引理}
+\geometry{top=2cm, bottom=2cm, textwidth=16cm}
+\title{求解线性微分方程的高阶量子算法}
+\author{王心锐}
+\begin{document}
+\maketitle
+
+\section{线性系统方法}
+
+为解决复杂度随演化时间 Δt 呈指数增长和无法求解非齐次线性微分方程的问题，我们提出一种基于HHL算法的方法。其关键在于引入“费曼时钟（Feynman's clock）”——通过一个额外的寄存器对时间进行编码。随后，我们仅用一个量子态就能对微分方程在所有时刻的解进行编码。也就是说，我们希望得到一个与之成比例的最终量子态：
+\[
+|\psi\rangle := \sum_{j=0}^{N_{t}} |t_{j}\rangle |x_{j}\rangle.
+\]
+
+其中，:=是定义符号，\(N_t\)为时间步数，\(t_j = t_0 + jh\)（\(h\)是微分方程离散化后的时间步长，\(t_0\)是微分方程求解的初始时刻），\(x_j\)是时刻\(t_j\)处向量\(x\)的近似值，\(\Delta t\)是求解微分方程的总时间跨度。本文中，我们用下标\(j\)表示向量的索引，用上标表示向量的分量。
+
+一旦构建出这个量子态，通过测量编码时间的寄存器并得到最终时刻\(t_0+\Delta t\)，就能近似得到编码该时刻解的量子态。不过，仅采用这种方法时，测得最终时刻的概率很低，仅为\(\frac{1}{N_t + 1}\)。为显著提高成功概率，我们可以在\(t_0+\Delta t\)之后增加一段“解保持恒定”的时间区间：令向量\(x\)在\(t_0+\Delta t\)到\(t_0 + 2\Delta t\)时间段内保持不变，此时时间步数满足\(N_t = \frac{2\Delta t}{h}\)。这样一来，只要测量到的时间落在该区间内，就能得到对应解的量子态。通过这种方法，成功概率可显著提高，且不会改变\(N_t\)的复杂度缩放趋势。
+
+数值求解微分方程的最简单方法是欧拉法（Euler method），其将微分方程离散化为：
+\[
+\frac{x_{j+1}-x_{j}}{h} = A(t_{j}) x_{j} + b(t_{j}). 
+\]
+
+对\(t > t_0+\Delta t\)的时间段，我们令\(x_{j+1}=x_j\)，以确保解的恒定。将欧拉法编码为线性方程组的形式十分直接，即：
+\[
+\mathcal{A} \vec{x} = \vec{b}. 
+\]
+
+其中，\(\vec{x}\)是由各时刻向量\(x_j\)构成的块向量，\(\vec{b}\)是由非齐次项\(b\)和初始条件\(x_{in}\)构成的块向量，\(\mathcal{A}\)是描述离散化微分方程的块矩阵。当\(A\)和\(b\)不随时间变化时，可给出如下简单示例：
+\[
+\underbrace{\begin{pmatrix}
+\mathbf{I} & 0 & 0 & 0 & 0 \\
+-(\mathbf{I} + Ah) & \mathbf{I} & 0 & 0 & 0 \\
+0 & -(\mathbf{I} + Ah) & \mathbf{I} & 0 & 0 \\
+0 & 0 & -\mathbf{I} & \mathbf{I} & 0 \\
+0 & 0 & 0 & -\mathbf{I} & \mathbf{I}
+\end{pmatrix}}_{\mathcal{A}} 
+\underbrace{\begin{pmatrix}
+x_0 \\
+x_1 \\
+x_2 \\
+x_3 \\
+x_4
+\end{pmatrix}}_{\vec{x}} 
+= 
+\underbrace{\begin{pmatrix}
+x_{in} \\
+bh \\
+bh \\
+0 \\
+0
+\end{pmatrix}}_{\vec{b}}. 
+\]
+
+矩阵\(\mathcal{A}\)的每个元素都是与矩阵\(A\)同维度的块，向量\(\vec{x}\)和\(\vec{b}\)的每个元素都是与向量\(x\)同维度的块。其中：
+\begin{itemize}
+    \item 第一行用于设定初始值，即\(x_0 = x_{in}\)；
+    \item 后续几行对应欧拉法离散化的微分方程，即\(x_{j+1} - (x_j + A x_j h) = bh\)；
+    \item 最后几行对应“解保持恒定”的约束条件，即\(x_{j+1} - x_j = 0\)。
+\end{itemize}
+
+欧拉法的单步误差缩放阶为\(O(h^2)\)，因此总模拟误差可表示为\(O(N_t h^2) = O\left(\frac{\Delta t^2}{N_t}\right)\)。若要求总误差不超过\(\epsilon\)（此处\(\epsilon\)为微分方程求解的允许误差，与线性方程组求解的允许误差\(\epsilon_L\)相区分），则需选择时间步数\(N_t = O\left(\frac{\Delta t^2}{\epsilon}\right)\)。要确定通过HHL算法求解该线性方程组的复杂度，需先估算其条件数。
+
+对条件数的粗略估算可通过分析“给定\(\vec{b}\)时\(\vec{x}\)的最大可能规模”实现：直观上，\(\vec{b}\)的每个分量可视为一个“激励源”，该激励会导致后续时刻\(\vec{x}\)的数值增大；由于共有\(O(N_t)\)个时刻受此激励影响，因此\(\vec{x}\)的规模约为\(\vec{b}\)的\(O(N_t)\)倍。不难发现，矩阵\(\mathcal{A}\)的算子范数\(\|\mathcal{A}\| \approx 1\)，因此其条件数\(\kappa(\mathcal{A}) = O(N_t)\)。这使得算法复杂度的缩放阶至少为\(O(\Delta t^4)\)（后续章节将对此进行严格证明）。
+
+条件数的定义是: 
+\[
+\kappa(\mathcal{A}) = \| \mathcal{A} \| \cdot \| \mathcal{A}^{-1} \|
+\]
+
+其中\(\| \mathcal{A}^{-1} \|\)是逆矩阵\(\mathcal{A}^{-1}\)的算子范数，衡量逆矩阵对向量的最大放大能力。
+
+结合式子的物理意义：离散化矩阵\(\mathcal{A}\)对应的线性系统\(\mathcal{A}\vec{x} = \vec{b}\)中，\(\vec{b}\)是输入（如初始条件\(x_{\text{in}}\)、激励\(bh\)），\(\vec{x}\)是输出（各时间步的状态\(x_0, x_1, \dots, x_{N_t}\)）。由于状态\(\vec{x}\)是通过\(N_t\)个时间步累积得到的（每一步的状态依赖前一步），逆矩阵\(\mathcal{A}^{-1}\)的作用本质是“从输入\(\vec{b}\)还原出累积的状态\(\vec{x}\)”，其放大能力会随时间步数\(N_t\)增长——即
+\[
+\| \mathcal{A}^{-1} \| \approx O(N_t)
+\]（与时间步数成正比）。
+
+再结合\(\| \mathcal{A} \| \approx 1\)，代入条件数定义可得: 
+\[
+\kappa(\mathcal{A}) = \| \mathcal{A} \| \cdot \| \mathcal{A}^{-1} \| \approx 1 \cdot O(N_t) = O(N_t)
+\]
+
+相较于哈密顿模拟中\(O(\Delta t)\)（或接近线性）的时间缩放阶，上述\(\Delta t\)的缩放效果并不理想。与哈密顿模拟类似，我们可通过高阶方法改善缩放性能——对于微分方程，适用的高阶方法是线性多步法（Linear Multistep Methods）。第四部分将介绍多步法的基本原理，第五部分将说明如何对条件数进行界估计，第六部分则会阐述HHL算法的具体应用及最终复杂度。
+
+
+\section{多步法}
+
+线性多步法的通用形式如下：
+\[
+\sum_{\ell=0}^{k} \alpha_{\ell} x_{j+\ell} = h \sum_{\ell=0}^{k} \beta_{\ell} \left[A(t_{j+\ell}) x_{j+\ell} + b(t_{j+\ell})\right]. 
+\]
+
+选择合适的多步法可使误差在步长\(h\)上达到更高阶，但该方法存在稳定性问题。为保证误差有界，矩阵\(A(t_j)\)的特征值需满足“实部非正”——否则误差会呈指数增长。若\(A(t_j)\)存在实部为正的特征值，可通过减去单位矩阵的若干倍并对解进行重新缩放来处理。即便如此，当微分方程的精确解有界时，差分方程的数值解仍可能无界。
+
+为分析稳定性，定义生成多项式：
+\[
+\rho(\zeta) = \sum_{j=0}^{k} \alpha_{j} \zeta^{j}, \quad \sigma(\zeta) = \sum_{j=0}^{k} \beta_{j} \zeta^{j}.
+\]
+
+稳定性可通过以下方程的根进行分析：
+\[
+\rho(\zeta) - \mu \sigma(\zeta) = 0. 
+\]
+
+定义集合\(S\)：
+\[
+S := \left\{ \mu \in \mathbb{C} \mid \begin{array}{l} \text{方程\(
+\rho(\zeta) - \mu \sigma(\zeta) = 0 
+\)的所有根}\ \zeta_j(\mu) \\ \ \text{满足}\ |\zeta_j(\mu)| \leq 1 \text{重根满足}\ |\zeta_j(\mu)| < 1 \end{array} \right\}. 
+\]
+
+集合\(S\)被称为多步法的稳定域（Stability Domain）。此外，若多项式\(\sigma(\zeta)\)的所有根满足\(|\zeta| \leq 1\)，且重根满足\(|\zeta| < 1\)，则称该多步法在“无穷远处稳定（stable at infinity）”。
+
+若线性多步法的局部误差缩放阶为\(O(h^{p+1})\)，则称该方法为\(p\)阶方法。这意味着：若将该方法应用于测试方程\(\dot{x} = t^q\)（\(0 \leq q \leq p\)）且初始值精确，则该方法可无误差地对该方程进行积分。线性多步法为\(p\)阶的充要条件是：
+\[
+\rho(e^h) - h \sigma(e^h) = O(h^{p+1}). 
+\]
+
+线性多步法的一个重要性质是“A-稳定性（A-stable）”。
+
+\begin{definition}[A-稳定性]
+若线性多步法的稳定域\(S\)包含整个左半复平面（\(\mathbb{C}^- = \{\mu \in \mathbb{C} \mid \text{Re}(\mu) \leq 0\}\)），即：
+\[
+\text{若}\ \text{Re}(\lambda) \leq 0,\ \text{则方程}\ \dot{x} = \lambda x\ \text{的数值解有界}
+\]
+\end{definition}
+
+该定义表明：若微分方程的精确解有界，则多步法给出的近似解也有界。对于标量微分方程，只要\(\lambda\)落在左半复平面内，多步法的数值解就有界。虽然欧拉法具备A-稳定性，但无法构造任意阶数的A-稳定多步法——这就是“达尔奎斯特第二障碍（Second Dahlquist Barrier）”：A-稳定线性多步法的阶数\(p \leq 2\)。由于本文需考虑高阶多步法，因此放宽稳定性要求，采用“A (\(\alpha\))-稳定性（A (\(\alpha \))-stable）”。
+
+\begin{definition}[A (\(\alpha \))-稳定性]
+对于\(0 < \alpha < \frac{\pi}{2}\)，若线性多步法的稳定域\(S\)包含“左半复平面内的\(\alpha \)-楔形区域”\(S_\alpha\)，即：
+\[
+S \supset S_\alpha = \{\mu \in \mathbb{C} \mid |\arg(-\mu)| < \alpha,\ \mu \neq 0\}, 
+\]
+则称该线性多步法是A (\(\alpha \))-稳定的。
+\end{definition}
+
+该定义表明：
+\begin{itemize}
+    \item 对于标量微分方程，只要特征值\(\lambda\)落在左半复平面内的\(\alpha\)-楔形区域（即\(|\arg(-\lambda)| \leq \alpha\)），多步法的数值解就有界；
+    \item 对于向量微分方程，只需系数矩阵\(A\)的所有特征值满足上述\(\alpha\)-楔形区域条件即可。
+\end{itemize}
+
+已知结论为：对于任意\(\alpha < \frac{\pi}{2}\)和正整数\(k\)，存在“\(k\)步、\(p=k\)阶”的\(A(\alpha)\)-稳定线性多步法。
+
+
+微分方程数值解的总误差缩放阶为 \(O\left(N_t {\Delta t}^{p+1}\right)\)。为得到严格的误
+差界，本文限定系数矩阵 \(A\) 和非齐次项 \(b\) 与时间无关（即线性定常微分方程）。
+
+
+
+\begin{theorem}
+设线性多步法为\(p\)阶方法，且满足A (\(\alpha \))-稳定和无穷远处稳定。若矩阵\(A\)可对角化（即存在矩阵\(V\)，使得\(V^{-1} A V = D = \text{diag}(\lambda_1, \dots, \lambda_{N_x})\)），且其特征值满足：
+\[
+|\arg(-\lambda_i)| \leq \alpha\quad (i=1,2,\dots,N_x), 
+\]
+则存在仅依赖于该多步法的常数\(M\)，使得对所有\(h > 0\)，全局误差满足：
+\[
+\|x(t_m) - x_m\| \leq M \kappa_V \left( \max_{0 \leq j < k} \|x(t_j) - x_j\| + h^p \int_{t_0}^{t_m} \|x^{(p+1)}(\xi)\| d\xi \right),
+\]
+其中\(\kappa_V = \|V\| \cdot \|V^{-1}\|\)是矩阵\(V\)的条件数，上标\((p+1)\)表示向量的\((p+1)\)阶导数。
+\end{theorem}
+
+利用上述定理，可得到关于误差缩放阶的引理：
+
+\begin{lemma}
+设线性多步法为\(p\)阶方法，且满足A (\(\alpha \))-稳定和无穷远处稳定。若矩阵\(A\)可对角化（即存在矩阵\(V\)，使得\(V^{-1} A V = D = \text{diag}(\lambda_1, \dots, \lambda_{N_x})\)），其特征值满足：
+\[
+|\arg(-\lambda_i)| \leq \alpha\quad (i=1,2,\dots,N_x),
+\]
+且非齐次项\(b\)为常数，则全局误差满足：
+\[
+\|x(t_m) - x_m\| = O\left( \kappa_V^2 \left( \|x_{init}\| + \frac{\|b\|}{\|A\|} 
+\right) \left[ \kappa_V {h\|A\|}^2 + m {h\|A\|}^{p+1} \right] \right), 
+\]
+其中\(\kappa_V = \|V\| \cdot \|V^{-1}\|\)是矩阵\(V\)的条件数。
+\end{lemma}
+
+\begin{proof}
+线性多步法需通过“启动方法（starting method）”获取\(0 < j < k\)时\(x_j\)的值，式中\(\max_{0 \leq j < k} \|x(t_j) - x_j\|\)项即源于启动方法的误差。此处可直接采用欧拉法作为启动方法，其误差缩放阶为\(O(h^2)\)；虽也可采用更高阶的启动方法，但目前缺乏便于应用的严格误差结果。
+
+对欧拉法的误差分析可直接利用定理1：欧拉法的步数\(k=1\)、阶数\(p=1\)，且初始点误差为0（\(x(t_0) = x_0\)），因此定理1给出：
+\[
+\|x(t_j) - x_j\| \leq M_E \kappa_V h \int_{t_0}^{t_j} \|x^{(2)}(\xi)\| d\xi, 
+\]
+其中\(M_E\)是欧拉法对应的常数。将该式应用于\(0 \leq j < k\)，可得：
+\[
+\max_{0 \leq j < k} \|x(t_j) - x_j\| \leq M_E \kappa_V h^2 (k-1) \max_{\xi \in [t_0, t_0 + (k-1)h]} \|x^{(2)}(\xi)\|.
+\]
+
+分析上述结果时，需对\(\|x^{(p+1)}(\xi)\|\)和\(\|x^{(2)}(\xi)\|\)进行上界估计，这两个量通常依赖于\(b(t)\)及其时间相关性。当\(b\)为常数时，微分方程的精确解为：
+\[
+x(t) = e^{A(t - t_0)} \left( x_{init} + A^{-1} b \right) - A^{-1} b. 
+\]
+其\(\ell\)阶导数为：
+\[
+x^{(\ell)}(t) = e^{A(t - t_0)} \left( A^\ell x_{init} + A^{\ell-1} b \right), 
+\]
+因此导数的范数满足：
+\[
+\begin{aligned}
+\|x^{(\ell)}(t)\| &= \| V e^{D(t - t_0)} V^{-1} \left( A^\ell x_{init} + A^{\ell-1} b \right) \| \\
+&\leq \kappa_V \left( \|A\|^\ell \|x_{init}\| + \|A\|^{\ell-1} \|b\| \right)
+\end{aligned}
+\]
+上式第一行利用了矩阵\(A\)的对角化性质，第二行利用了特征值的约束条件\(|\arg(-\lambda_i)| \leq \alpha\)。
+
+将上述结果代入定理1，可得误差界：
+\[
+\begin{aligned}
+\|x(t_m) - x_m\| 
+&\leq M \kappa_V \left( 
+  \max_{0 \leq j < k} \|x(t_j) - x_j\| + 
+  h^p \int_{t_0}^{t_m} \|x^{(p+1)}(\xi)\| d\xi 
+\right) \\
+&\leq M \kappa_V \left[ 
+  M_E \kappa_V^2 h^2 k \left( \|x_{\text{init}}\| + \frac{\|b\|}{\|A\|} \right) \|A\|^2 + \right. \\
+&\qquad \left. h^p (t_m - t_0) \kappa_V \left( \|x_{\text{init}}\| + \frac{\|b\|}{\|A\|} \right) \|A\|^{p+1} 
+\right] \\
+&= O\left( 
+  \kappa_V^2 \left( \|x_{\text{init}}\| + \frac{\|b\|}{\|A\|} \right) 
+  \left[ \kappa_V {h\|A\|}^2 + m {h\|A\|}^{p+1} \right] 
+\right).
+\end{aligned}
+\]
+\end{proof}
+
+该结果表明：若忽略对多数参量的依赖及启动方法的误差，总误差随总时间\(\Delta t\)的缩放阶为\(O\left( {\|A\| h}^p \|A\| \Delta t \right)\)。若要求总误差不超过\(\epsilon\)，则需选择时间步数：
+\[
+N_t = O\left( \frac{{\|A\| \Delta t}^{1 + \frac{1}{p}}}{\epsilon^{\frac{1}{p}}} \right).
+\]
+即所需时间步数随总时间\(\Delta t\)的增长接近线性。
+
+接下来考虑如何将多步法编码为线性方程组\(\mathcal{A}\vec{x} = \vec{b}\)。前文已介绍欧拉法的编码方式，更一般地，我们采用“欧拉法启动→高阶多步法迭代→恒定解约束”的流程：对于\(N_t \geq 2k\)，矩阵\(\mathcal{A}\)的块元素定义为：
+\[
+\begin{cases}
+\mathcal{A}_{j,j} = \mathbf{I}, & 0 \leq j < k ,\ \frac{N_t}{2} < j \leq N_t, \\
+\mathcal{A}_{j,j-1} = -(\mathbf{I}+ Ah), & 1 \leq j < k, \\
+\mathcal{A}_{j,j - k + \ell} = \alpha_\ell \mathbf{I} - \beta_\ell Ah, & k \leq j \leq \frac{N_t}{2},\ 0 \leq \ell \leq k, \\
+\mathcal{A}_{j,j-1} = -\mathbf{I}, & \frac{N_t}{2} < j \leq N_t.
+\end{cases}
+\]
+采用该矩阵时需满足\(N_t \geq 2k\)，否则缺乏足够的时间步启动线性多步法。向量\(\vec{b}\)的块元素定义为：
+\[
+\begin{cases}
+b_0 = x_{in}, \\
+b_j = bh, & 1 \leq j < k, \\
+b_j = \sum_{\ell=0}^k \beta_\ell bh, & k \leq j \leq \frac{N_t}{2}, \\
+b_j = 0, & \frac{N_t}{2} < j \leq N_t.
+\end{cases} 
+\]
+
+本文要求矩阵\(A\)、向量\(b\)和初始向量\(x_{in}\)均为稀疏矩阵/向量，即任意行或列的非零元素个数不超过\(s\)。假设所用“预言机（oracle）”的形式与文献[8]一致：
+\begin{itemize}[label={-}]
+    \item 矩阵\(A\)的预言机是一个幺正算子，作用形式为：
+    \[
+    O_A |j,\ell\rangle |z\rangle = |j,\ell\rangle |z \oplus A^{[j,\ell]}\rangle, 
+    \]
+    其中\(\oplus\)表示模加法，\(A^{[j,\ell]}\)是矩阵\(A\)第\(j\)行第\(\ell\)列元素的二进制表示（上标表示块内索引）。
+    \item 稀疏性预言机用于定位非零元素：设函数\(f(j,\ell)\)表示“第\(j\)列第\(\ell\)个非零元素所在的行索引”，则该预言机为幺正算子，作用形式为：
+    \[
+    O_F |j,\ell\rangle = |j, f(j,\ell)\rangle. 
+    \]
+\end{itemize}
+
+由于矩阵\(A\)非厄米，还需类似的预言机定位“给定行中的非零元素”；同时，还需用于获取\(b\)和\(x_{in}\)非零元素“位置与数值”的预言机。这些预言机可确保高效制备与\(\vec{b}\)对应的初始量子态；此外，也可假设\(b\)和\(x_{in}\)满足文献[24]中“高效制备流程”的条件。
+
+利用文献[12]中的算法求解上述线性方程组，其复杂度为\(\tilde{O}\left( \log(N) s^4 \kappa^2 / \epsilon_L \right)\)，其中\(\kappa\)是矩阵\(\mathcal{A}\)的条件数，\(\epsilon_L\)是线性方程组求解的允许误差（需注意：文献[12]中\(s\)的指数误写为2，实际应为4）。需强调的是，\(\epsilon_L\)是线性方程组求解的允许误差，与微分方程求解的允许误差\(\epsilon\)是两个不同的量。
+
+\end{document}
