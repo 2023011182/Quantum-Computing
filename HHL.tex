@@ -13,20 +13,22 @@
 
 \begin{document}
 \maketitle
-
+\tableofcontents
+\newpage
 \section{概述}
 HHL算法用于求解线性方程组 \( A\vec{x} = \vec{b} \)，其中 \( A \) 为 \( N_b \times N_b \) 厄米矩阵，
 \(\vec{x}\)和\(\vec{b}\)为\( N_b \)维向量，其解可表示为\( \vec{x} = A^{-1}\vec{b} \)，其中\( N_b=2^{n_b} \)。
 该算法通过量子态的振幅编码和演化，实现了相比经典方法的指数级加速，是量子计算中解决线性系统问题的核心算法之一。
 
-算法中向量 \(\vec{b}\) 和 \(\vec{x}\) 的 \(N_b\) 个分量通过振幅编码（amplitude encoding），由 \(n_b\) 个量子比特（构成 \(\mathbb{C}^{N_b}\) 希尔伯特空间，记为 b-register ）进行编码，\(n_b\) 需足够大以完整编码 \(\vec{b}\) 。矩阵 \(A\) 则通过哈密顿量编码（Hamiltonian encoding）模拟实现。
+算法中向量 \(\vec{b}\) 和 \(\vec{x}\) 的 \(N_b\) 个分量通过振幅编码，由 \(n_b\) 个量子比特（构成 \(\mathbb{C}^{N_b}\) 希尔伯特空间，记为 b-register ）进行编码，\(n_b\) 需足够大以完整编码 \(\vec{b}\) 。矩阵 \(A\) 则通过哈密顿量编码模拟实现。
 
-HHL 算法主要包含五大核心模块：状态制备（state preparation）、量子相位估计（quantum phase estimation, QPE）、辅助比特旋转（ancilla bit rotation）、逆量子相位估计（inverse quantum phase estimation, IQPE）及测量（measurement） 。
+HHL 算法主要包含五大核心模块：状态制备、量子相位估计、辅助比特旋转、逆量子相位估计（IQPE）及测量 。
 除 \(n_b\) 个用于编码 \(\vec{b}\) 振幅及最终存储 \(\vec{x}\) 结果振幅的量子比特外，算法还需 1 个辅助量子比特 \(|\rangle_a\) 与 \(n\) 个时钟量子比特（clock qubits，记为 c-register ）。辅助量子比特虽最终会被舍弃，但对算法目标实现至关重要；时钟量子比特用于存储矩阵 \(A\) 编码后的特征值，且 \(n\) 越大（对应 \(N = 2^n\) ），在编码非精确场景下算法结果精度越高 。 
 
 作为哈密顿量的矩阵 \(A\)，可在其本征向量基下展开为线性组合形式。由于 \(A\) 是哈密顿量，它可表示为其本征向量 \(|u_i\rangle\) 按本征值 \(\lambda_i\) 加权的线性组合，即：
 \[A = \sum_{i=0}^{2^{n_b}-1} \lambda_i |u_i\rangle \langle u_i|\]
 其中，\(n_b\) 为与编码相关的量子比特数，对应构建的希尔伯特空间维度为\(2^{n_b}\)。
+
 鉴于 \(A\) 在其本征向量基下是对角矩阵，其逆矩阵 \(A^{-1}\) 可简便表示为：
 \[A^{-1} = \sum_{i=0}^{2^{n_b}-1} \lambda_i^{-1} |u_i\rangle \langle u_i|\]
 同时，向量 \(\vec{b}\) 也能在 \(A\) 的本征向量基下展开，形式为：
@@ -80,37 +82,43 @@ HHL 算法的目标便是以这种形式求解，且解 \(|x\rangle\) 存储于 
 =|b\rangle \frac{1}{2^{\frac{n}{2}}}{\left(|0\rangle+|1\rangle\right)}^{\otimes n}|0\rangle
 \]
 \subsubsection{受控旋转}
-在受控旋转部分，将$U$应用于$|b\rangle$，其中时钟量子比特作为控制量子比特（图2）。为简单起见，我们首先假设$|b\rangle$是$U$的特征向量，其特征值为$e^{2 \pi i \phi}$。因此：
-\[
-U|b\rangle=e^{2 \pi i \phi}|b\rangle \quad
-\]
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=\textwidth]{/home/wangxinrui/Quantum-Computing/HHL2.png}
-    \caption{QPE 的受控旋转部分。在 HHL 算法中，$U$ 由 $e^{iAt}$ 取代。}
-\end{figure}
-当控制时钟量子比特为$0$时，$|b\rangle$不会受到影响。如果时钟比特为$1$，则将$U$应用于$|b\rangle$。这相当于在第$j$个时钟量子比特的$1$前面乘以$e^{2 \pi i \phi 2^{j}}$。因此，在受控$U$操作之后，我们有：
-\[\begin{aligned} 
-\left|\Psi_{3}\right> & =|b\rangle \otimes\left(\frac{1}{2^{\frac{n}{2}}}\left(|0\rangle+e^{2 \pi i \phi 2^{n-1}}|1\rangle\right)\otimes \cdots \otimes\left(|0\rangle+e^{2 \pi i \phi 2^{0}}|1\rangle\right)\right) \otimes|0\rangle_{a} \\ 
-& =|b\rangle \frac{1}{2^{\frac{n}{2}}} \sum_{k=0}^{2^{n}-1} e^{2 \pi i \phi k}|k\rangle|0\rangle_{a} 
-\end{aligned}\]
-\subsubsection{逆量子傅里叶变换（IQFT）}
-在IQFT部分，只有时钟量子比特受到影响。注意，在某些文献中，这被称为量子傅里叶变换（QFT）。
-\[
-\begin{aligned} 
-\left|\Psi_{4}\right> & =|b\rangle I Q F T\left(\frac{1}{2^{\frac{n}{2}}} \sum_{k=0}^{2^{n}-1} e^{2 \pi i \phi k}|k\rangle\right)|0\rangle_{a} \\ 
-& =|b\rangle \frac{1}{2^{\frac{n}{2}}} \sum_{k=0}^{2^{n}-1} e^{2 \pi i \phi k}(I Q F T|k\rangle)|0\rangle_{a} \\ 
-& =|b\rangle \frac{1}{2^{n}} \sum_{k=0}^{2^{n}-1} e^{2 \pi i \phi k}\left(\sum_{y=0}^{2^{n}-1} e^{-2 \pi i y k / N}|y\rangle\right)|0\rangle_{a} \\ 
-& =\frac{1}{2^{n}}|b\rangle \sum_{y=0}^{2^{n}-1} \sum_{k=0}^{2^{n}-1} e^{2 \pi i k(\phi-y / N)}|y\rangle|0\rangle_{a} 
-\end{aligned}
-\]
+% 在受控旋转部分，将$U$应用于$|b\rangle$，其中时钟量子比特作为控制量子比特（图2）。为简单起见，我们首先假设$|b\rangle$是$U$的特征向量，其特征值为$e^{2 \pi i \phi}$。因此：
+% \[
+% U|b\rangle=e^{2 \pi i \phi}|b\rangle \quad
+% \]
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=\textwidth]{/home/wangxinrui/Quantum-Computing/HHL2.png}
+%     \caption{QPE 的受控旋转部分。在 HHL 算法中，$U$ 由 $e^{iAt}$ 取代。}
+% \end{figure}
+% 当控制时钟量子比特为$0$时，$|b\rangle$不会受到影响。如果时钟比特为$1$，则将$U$应用于$|b\rangle$。这相当于在第$j$个时钟量子比特的$1$前面乘以$e^{2 \pi i \phi 2^{j}}$。因此，在受控$U$操作之后，我们有：
+% \[\begin{aligned} 
+% \left|\Psi_{3}\right> & =|b\rangle \otimes\left(\frac{1}{2^{\frac{n}{2}}}\left(|0\rangle+e^{2 \pi i \phi 2^{n-1}}|1\rangle\right)\otimes \cdots \otimes\left(|0\rangle+e^{2 \pi i \phi 2^{0}}|1\rangle\right)\right) \otimes|0\rangle_{a} \\ 
+% & =|b\rangle \frac{1}{2^{\frac{n}{2}}} \sum_{k=0}^{2^{n}-1} e^{2 \pi i \phi k}|k\rangle|0\rangle_{a} 
+% \end{aligned}\]
+% \subsubsection{逆量子傅里叶变换（IQFT）}
+% 在IQFT部分，只有时钟量子比特受到影响。注意，在某些文献中，这被称为量子傅里叶变换（QFT）。
+% \[
+% \begin{aligned} 
+% \left|\Psi_{4}\right> & =|b\rangle I Q F T\left(\frac{1}{2^{\frac{n}{2}}} \sum_{k=0}^{2^{n}-1} e^{2 \pi i \phi k}|k\rangle\right)|0\rangle_{a} \\ 
+% & =|b\rangle \frac{1}{2^{\frac{n}{2}}} \sum_{k=0}^{2^{n}-1} e^{2 \pi i \phi k}(I Q F T|k\rangle)|0\rangle_{a} \\ 
+% & =|b\rangle \frac{1}{2^{n}} \sum_{k=0}^{2^{n}-1} e^{2 \pi i \phi k}\left(\sum_{y=0}^{2^{n}-1} e^{-2 \pi i y k / N}|y\rangle\right)|0\rangle_{a} \\ 
+% & =\frac{1}{2^{n}}|b\rangle \sum_{y=0}^{2^{n}-1} \sum_{k=0}^{2^{n}-1} e^{2 \pi i k(\phi-y / N)}|y\rangle|0\rangle_{a} 
+% \end{aligned}
+% \]
 
-由于干涉，只有满足$\phi - y/N=0$的$|y\rangle$会有$\sum_{k=0}^{2^{n}-1} e^{0}=2^{n}$的有限振幅。否则，由于相消干涉，振幅为$\sum_{k=0}^{2^{n}-1} e^{2 \pi i k(\phi - y/N)}=0$。忽略振幅为零的状态，我们可以将$|\Psi_{4}\rangle$重写为：
+由于干涉，只有满足$\phi - y/N=0$的$|y\rangle$会有$\sum_{k=0}^{2^{n}-1} e^{0}=2^{n}$的有限振幅。
+
+否则，由于相消干涉，振幅为$\sum_{k=0}^{2^{n}-1} e^{2 \pi i k(\phi - y/N)}=0$。
+
+忽略振幅为零的状态，我们可以将$|\Psi_{4}\rangle$重写为：
 \[
 \left|\Psi_{4}\right>=|b\rangle|N \phi\rangle|0\rangle_{a} \quad
 \]
 
-因此，在QPE中，时钟量子比特用于表示$U$的相位信息$\phi$，其精度取决于量子比特的数量$n$。
+因此，在QPE中，时钟量子比特用于表示$U$的相位信息$\phi$，
+
+其精度取决于量子比特的数量$n$。
 
 在哈密顿量编码中，$U$与$A$的关系为：
 \[
@@ -124,22 +132,22 @@ U=e^{i A t} \quad
 U|b\rangle=e^{i \lambda_{j} t}\left|u_{j}\right\rangle
 \]
 
-通过将式$U|b\rangle=e^{2 \pi i \phi}|b\rangle$中的$2\pi i\phi$等同于$i\lambda_{j}t$，我们得到$\phi=\lambda_{j}t/(2\pi)$，则$\left|\Psi_{4}\right>$变为：
-\[
-\left|\Psi_{4}\right>=\left|u_{j}\right\rangle\left|N \lambda_{j} t / 2 \pi\right\rangle|0\rangle_{a}
-\]
+% 通过将式$U|b\rangle=e^{2 \pi i \phi}|b\rangle$中的$2\pi i\phi$等同于$i\lambda_{j}t$，我们得到$\phi=\lambda_{j}t/(2\pi)$，则$\left|\Psi_{4}\right>$变为：
+% \[
+% \left|\Psi_{4}\right>=\left|u_{j}\right\rangle\left|N \lambda_{j} t / 2 \pi\right\rangle|0\rangle_{a}
+% \]
 
-这样，$A$的特征值就被编码到了时钟量子比特中（基编码）。
+% 这样，$A$的特征值就被编码到了时钟量子比特中（基编码）。
 
-然而，一般来说，$|b\rangle=\sum_{j=0}^{2^{n_{b}-1}}b_{j}|u_{j}\rangle$，利用叠加原理，有：
-\[
-\left|\Psi_{4}\right>=\sum_{j=0}^{2^{n_{b}-1}} b_{j}\left|u_{j}\right\rangle\left|N \lambda_{j} t / 2 \pi\right\rangle|0\rangle_{a}
-\]
+% 然而，一般来说，$|b\rangle=\sum_{j=0}^{2^{n_{b}}-1}b_{j}|u_{j}\rangle$，利用叠加原理，有：
+% \[
+% \left|\Psi_{4}\right>=\sum_{j=0}^{2^{n_{b}}-1} b_{j}\left|u_{j}\right\rangle\left|N \lambda_{j} t / 2 \pi\right\rangle|0\rangle_{a}
+% \]
 
-$\lambda_{j}$通常不是整数。我们会选择$t$，使得$\tilde{\lambda_{j}}=N\lambda_{j}t/(2\pi)$为整数。因此，编码值$\tilde{\lambda_{j}}$可以与$\lambda_{j}$不同。$\Psi_{4}$可以重写为：
-\[
-\left|\Psi_{4}\right>=\sum_{j=0}^{2^{n_{b}-1}} b_{j}\left|u_{j}\right\rangle\left|\tilde{\lambda}_{j}\right\rangle|0\rangle_{a}
-\]
+% $\lambda_{j}$通常不是整数。我们会选择$t$，使得$\tilde{\lambda_{j}}=N\lambda_{j}t/(2\pi)$为整数。因此，编码值$\tilde{\lambda_{j}}$可以与$\lambda_{j}$不同。$\Psi_{4}$可以重写为：
+% \[
+% \left|\Psi_{4}\right>=\sum_{j=0}^{2^{n_{b}}-1} b_{j}\left|u_{j}\right\rangle\left|\tilde{\lambda}_{j}\right\rangle|0\rangle_{a}
+% \]
 \subsection{辅助量子比特的受控旋转与测量}
 
 下一步是基于时钟寄存器（c-register）中编码的特征值旋转辅助量子比特\(|0\rangle_a\)，旋转后的态为：

@@ -1,0 +1,23 @@
+\contentsline {section}{\numberline {1}概述}{2}{}%
+\contentsline {section}{\numberline {2}算法核心步骤}{2}{}%
+\contentsline {subsection}{\numberline {2.1}状态制备}{2}{}%
+\contentsline {subsection}{\numberline {2.2}量子相位估计（QPE）}{3}{}%
+\contentsline {subsubsection}{\numberline {2.2.1}时钟量子比特叠加}{3}{}%
+\contentsline {subsubsection}{\numberline {2.2.2}受控旋转}{4}{}%
+\contentsline {subsection}{\numberline {2.3}辅助量子比特的受控旋转与测量}{4}{}%
+\contentsline {subsection}{\numberline {2.4}反计算——逆量子相位估计（IQPE）}{4}{}%
+\contentsline {subsection}{\numberline {2.5}H门作用于多比特全0寄存器的计算过程}{5}{}%
+\contentsline {subsubsection}{\numberline {2.5.1}单比特情况}{5}{}%
+\contentsline {subsubsection}{\numberline {2.5.2}多比特情况}{6}{}%
+\contentsline {subsubsection}{\numberline {2.5.3}结论}{6}{}%
+\contentsline {section}{\numberline {3}数值示例}{7}{}%
+\contentsline {subsection}{\numberline {3.1}编码方案}{7}{}%
+\contentsline {subsection}{\numberline {3.2}受控-U实现}{7}{}%
+\contentsline {subsection}{\numberline {3.3}辅助量子比特的受控旋转实现}{8}{}%
+\contentsline {subsection}{\numberline {3.4}量子电路}{9}{}%
+\contentsline {subsection}{\numberline {3.5}数值代入}{10}{}%
+\contentsline {subsection}{\numberline {3.6}H门作用于$|\Psi _8\rangle $生成$|\Psi _9\rangle $的具体过程}{12}{}%
+\contentsline {subsubsection}{\numberline {3.6.1}初始态$|\Psi _8\rangle $的表达式}{12}{}%
+\contentsline {subsubsection}{\numberline {3.6.2}H门对2量子比特系统的作用}{13}{}%
+\contentsline {subsubsection}{\numberline {3.6.3}H门作用于$|\Psi _8\rangle $的时钟部分}{13}{}%
+\contentsline {subsubsection}{\numberline {3.6.4}最终态$|\Psi _9\rangle $的生成}{13}{}%
